@@ -1,0 +1,29 @@
+{
+  "name": "auth-hub",
+  "version": "1.0.0",
+  "description": "Centralized Identity Management using Node.js &amp; Express. Acts as a facade for Keycloak with JWT-based security and zero-trust internal gRPC calls.", 
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "eslint . --ext .ts,.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brainwave-project/auth-hub.git"
+  },
+  "keywords": ["auth-hub", "identity-management", "keycloak", "jwt"],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist"],
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "eslint": "^8.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/brainwave-project/auth-hub/issues"
+  },
+  "homepage": "https://github.com/brainwave-project/auth-hub#readme"
+}
