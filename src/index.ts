@@ -1,3 +1,6 @@
-export function greet(name: string): string {
-  return `Hello, ${name}! I'm Good`;
-}
+import { startServer } from "./app.js";
+
+startServer().catch((err) => {
+  console.error("AuthHub failed to start", err);
+  process.exit(1);
+});

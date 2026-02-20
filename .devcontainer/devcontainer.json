@@ -1,6 +1,6 @@
 {
   "name": "auth-hub-dev",
-  "dockerFile": "Dockerfile",
+  "dockerFile": "../Dockerfile",
   "forwardPorts": [3000],
   "workspaceFolder": "/app",
   "customizations": {
