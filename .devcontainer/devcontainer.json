@@ -2,8 +2,8 @@
   "name": "auth-hub-dev",
   "dockerFile": "../Dockerfile",
   "forwardPorts": [3000],
-  "workspaceFolder": "/app",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "workspaceFolder": "/workspaces/authhub",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/authhub,type=bind",
   "customizations": {
     "vscode": {
       "settings": {
