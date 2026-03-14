@@ -114,6 +114,69 @@ npm run format
 
 ---
 
+## Testing with Keycloak
+
+When Keycloak runs (e.g. from your `infra/keycloak` docker-compose on port 8080), you can test the auth flow.
+
+### 1. Start Keycloak
+
+From your solution folder (e.g. `brainwave/infra/keycloak`):
+
+```bash
+docker compose up -d
+```
+
+Keycloak: **http://localhost:8080**  
+Admin: `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` from docker-compose (e.g. `admin` / `admin`).
+
+### 2. Create client in Keycloak
+
+1. Open **http://localhost:8080/admin** → sign in.
+2. Select realm **master** (or create a realm and use it in `KEYCLOAK_REALM`).
+3. **Clients** → **Create client**:
+   - **Client ID:** `auth-hub` (must match `KEYCLOAK_CLIENT_ID`).
+   - **Client type:** OpenID Connect.
+   - **Next** → Capability config:
+     - **Client authentication:** ON (confidential) if you want to use `KEYCLOAK_CLIENT_SECRET`; OFF for public client.
+     - **Authorization:** OFF.
+     - **Authentication flow:** ✅ Standard flow, ✅ Direct access grants (for password login).
+   - **Next** → Login settings:
+     - **Root URL:** `http://localhost:3000`
+     - **Valid redirect URIs:** `http://localhost:3000/api/auth/callback`
+     - **Valid post logout redirect URIs:** `http://localhost:3000`
+     - **Web origins:** `http://localhost:3000` or `*`
+   - **Save**.
+4. If confidential: **Clients** → **auth-hub** → **Credentials** → copy **Client secret** into `.env.development` as `KEYCLOAK_CLIENT_SECRET`.
+
+### 3. Create a test user (for direct login)
+
+1. **Users** → **Add user**:
+   - **Username:** `testuser`
+   - **Email:** (optional)
+   - **Create**.
+2. Open the user → **Credentials** → **Set password** (e.g. `testpass`), turn off **Temporary**.
+
+### 4. Run AuthHub and test
+
+```bash
+# From auth-hub folder
+npm run dev
+```
+
+- **Direct login (password grant):**
+  ```bash
+  curl -X POST http://localhost:3000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"testuser","password":"testpass"}'
+  ```
+- **OIDC redirect:** Open in browser (or use `redirect: true` from your app):
+  `http://localhost:8080/realms/master/protocol/openid-connect/auth?client_id=auth-hub&redirect_uri=http://localhost:3000/api/auth/callback&response_type=code&scope=openid`
+- **Refresh:** Use `refresh_token` from login response in `POST /api/auth/refresh` body.
+
+Env for this setup: `.env.development` with `KEYCLOAK_BASE_URL=http://localhost:8080`, `KEYCLOAK_REALM=master`, `KEYCLOAK_CLIENT_ID=auth-hub`, `KEYCLOAK_REDIRECT_BASE_URL=http://localhost:3000`. If AuthHub runs elsewhere, change the redirect URLs in Keycloak and `KEYCLOAK_REDIRECT_BASE_URL` to match.
+
+---
+
 ## Docker
 
 Build and run Core using Docker:

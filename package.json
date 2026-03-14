@@ -42,8 +42,12 @@
   },
   "homepage": "https://github.com/brainwave-project/auth-hub#readme",
   "dependencies": {
+    "@grpc/grpc-js": "^1.12.4",
+    "@grpc/proto-loader": "^0.7.13",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
+    "jose": "^5.9.6",
+    "prom-client": "^15.1.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   }

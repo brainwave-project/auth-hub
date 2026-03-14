@@ -5,14 +5,28 @@ import path from "path";
 const ENVIRONMENTS = ["development", "staging", "production"] as const;
 type Environment = (typeof ENVIRONMENTS)[number];
 
+/** Keycloak configuration (optional; auth routes use when present). */
+export type KeycloakConfig = {
+  baseUrl: string;
+  realm: string;
+  clientId: string;
+  clientSecret?: string;
+  /** Public base URL for redirects (e.g. https://api.example.com). */
+  redirectBaseUrl?: string;
+};
+
 /** Validated application configuration from environment variables. */
 export type EnvConfig = {
   port: number;
+  /** gRPC server port for service-to-service (e.g. ValidateToken). Optional; when set, gRPC server is started. */
+  grpcPort?: number;
   serviceName: string;
   environment: Environment;
   dbHost: string;
   dbUser: string;
   dbPass: string;
+  /** Keycloak config when KEYCLOAK_BASE_URL is set; used by auth routes. */
+  keycloak?: KeycloakConfig;
   /** Shorthand for environment === "development" */
   isDevelopment: boolean;
   /** Shorthand for environment === "staging" */
@@ -86,13 +100,31 @@ export function loadConfig(): EnvConfig {
     );
   }
 
+  const keycloakBaseUrl = process.env.KEYCLOAK_BASE_URL?.trim();
+  const keycloakRealm = process.env.KEYCLOAK_REALM?.trim();
+  const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID?.trim();
+  const grpcPort = parsePort(process.env.GRPC_PORT) ?? undefined;
+
+  let keycloak: KeycloakConfig | undefined;
+  if (keycloakBaseUrl && keycloakRealm && keycloakClientId) {
+    keycloak = {
+      baseUrl: keycloakBaseUrl.replace(/\/$/, ""),
+      realm: keycloakRealm,
+      clientId: keycloakClientId,
+      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET?.trim() || undefined,
+      redirectBaseUrl: process.env.KEYCLOAK_REDIRECT_BASE_URL?.trim() || undefined,
+    };
+  }
+
   return {
     port: port as number,
+    grpcPort: grpcPort ?? undefined,
     serviceName: serviceName as string,
     environment: environment as Environment,
     dbHost: dbHost as string,
     dbUser: dbUser as string,
     dbPass: dbPass as string,
+    keycloak,
     isDevelopment: environment === "development",
     isStaging: environment === "staging",
     isProduction: environment === "production",
