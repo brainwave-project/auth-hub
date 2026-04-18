@@ -1,0 +1,17 @@
+// auth-hub does not own any database schema directly.
+// It is a facade for Keycloak — all identity state lives in Keycloak.
+//
+// This file is a placeholder. If auth-hub ever needs its own persistence
+// (e.g. audit log of token operations), add models here and run:
+//   npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// No models yet.

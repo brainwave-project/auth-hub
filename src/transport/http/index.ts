@@ -1,13 +1,13 @@
-import type { Express } from "express";
-import type { EnvConfig } from "../../config/env.js";
-import { createRouter } from "../../routes/index.js";
+import type { Express } from 'express';
+import type { EnvConfig } from '../../config/env.js';
+import { createRouter } from './router.js';
 
 /**
- * Mounts the HTTP API (health, auth, tokens) onto the Express app.
- * Used by app.ts to expose REST endpoints for clients and gateways.
+ * Mounts the HTTP API onto the Express app.
+ * Entry point for all /api/* routes.
  */
 export function mountHttpApi(app: Express, config: EnvConfig): void {
-  app.use("/api", createRouter(config));
+  app.use('/api', createRouter(config));
 }
 
-export { createRouter } from "../../routes/index.js";
+export { createRouter } from './router.js';
