@@ -13,8 +13,37 @@ export function createAuthRouter(config: EnvConfig): Router {
    * @swagger
    * /api/auth/login:
    *   post:
-   *     summary: Initiates login with credentials or redirects to Keycloak (OIDC/OAuth2)
+   *     summary: Login with username/password (direct grant) or redirect to Keycloak OIDC flow
    *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               username: { type: string, example: "ahmad@brainwave.io" }
+   *               password: { type: string, format: password }
+   *               redirect: { type: boolean, description: "true = redirect to Keycloak login page instead of direct grant" }
+   *               state:    { type: string, description: "CSRF state token for OIDC flow" }
+   *     responses:
+   *       200:
+   *         description: Tokens issued (direct grant flow)
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/TokenResponse' }
+   *       302:
+   *         description: Redirect to Keycloak login page (OIDC flow)
+   *       400:
+   *         description: Missing credentials
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+   *       502:
+   *         description: Keycloak unreachable
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/ErrorResponse' }
    */
   router.post('/login', (req: Request, res: Response) => {
     const { username, password, redirect } = req.body || {};
@@ -63,8 +92,28 @@ export function createAuthRouter(config: EnvConfig): Router {
    * @swagger
    * /api/auth/logout:
    *   post:
-   *     summary: Logs out the current session
+   *     summary: Revoke session and redirect to Keycloak logout
    *     tags: [Auth]
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               id_token_hint:            { type: string, description: "ID token from Keycloak" }
+   *               post_logout_redirect_uri: { type: string, format: uri }
+   *     responses:
+   *       200:
+   *         description: Logout URL returned (client must redirect)
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:    { type: string }
+   *                 logout_url: { type: string, format: uri }
+   *       302:
+   *         description: Redirect to Keycloak logout (when id_token_hint provided)
    */
   router.post('/logout', (req: Request, res: Response) => {
     const { id_token_hint, post_logout_redirect_uri } = req.body || {};
@@ -83,8 +132,27 @@ export function createAuthRouter(config: EnvConfig): Router {
    * @swagger
    * /api/auth/refresh:
    *   post:
-   *     summary: Uses refresh token to issue new access token
+   *     summary: Exchange refresh token for a new access token
    *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [refresh_token]
+   *             properties:
+   *               refresh_token: { type: string }
+   *     responses:
+   *       200:
+   *         description: New token pair issued
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/TokenResponse' }
+   *       400:
+   *         description: refresh_token missing
+   *       502:
+   *         description: Keycloak unreachable
    */
   router.post('/refresh', (req: Request, res: Response) => {
     const { refresh_token } = req.body || {};
