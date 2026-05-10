@@ -1,44 +1,41 @@
-# syntax=docker/dockerfile:1.4
 # =============================================================================
 # auth-hub — Multi-stage Dockerfile
-# =============================================================================
-# Build from service directory:
-#
-#   cd auth-hub/
-#   docker build -t auth-hub .
-#
-# @brainwave-project/core is now a published npm package (@brainwave-project/core@^1.2.0)
 # =============================================================================
 
 # ---- Stage 1: Production dependencies ----
 FROM node:20-alpine AS deps
 
-ARG GITHUB_TOKEN
+ARG NPM_TOKEN
 
 WORKDIR /app
 
-COPY .npmrc package*.json ./
-RUN GITHUB_TOKEN=$GITHUB_TOKEN npm ci --omit=dev
+COPY package*.json ./
+RUN echo "@brainwave-project:registry=https://npm.pkg.github.com/" > .npmrc \
+ && echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc \
+ && npm ci --omit=dev \
+ && rm .npmrc
 
 
-# ---- Stage 2: Build (TypeScript → JavaScript) ----
+# ---- Stage 2: Build ----
 FROM node:20-alpine AS builder
 
-ARG GITHUB_TOKEN
+ARG NPM_TOKEN
 
 WORKDIR /app
 
-COPY .npmrc package*.json ./
+COPY package*.json ./
 COPY tsconfig.json ./
-RUN GITHUB_TOKEN=$GITHUB_TOKEN npm ci
+RUN echo "@brainwave-project:registry=https://npm.pkg.github.com/" > .npmrc \
+ && echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc \
+ && npm ci \
+ && rm .npmrc
 
 COPY src/ ./src/
 COPY *.proto ./
-
 RUN npm run build
 
 
-# ---- Stage 3: Runtime image ----
+# ---- Stage 3: Runtime ----
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -54,5 +51,4 @@ COPY --chown=appuser:nodejs package.json ./
 USER appuser
 
 EXPOSE 3000 50051
-
 CMD ["node", "dist/index.js"]
