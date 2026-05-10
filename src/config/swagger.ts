@@ -10,7 +10,10 @@ const options: swaggerJSDoc.Options = {
       version:     '1.0.0',
       description: 'Centralized identity management — Keycloak facade for login, logout, token refresh, and introspection.',
     },
-    servers: [{ url: '/api', description: 'AuthHub via Kong' }],
+    servers: [
+      { url: 'http://localhost:3000', description: 'Direct (dev)' },
+      { url: 'http://localhost:8000', description: 'Via Kong (dev)' },
+    ],
     tags: [
       { name: 'Auth',   description: 'Login, logout, token refresh, and OIDC callback' },
       { name: 'Tokens', description: 'Token validation, introspection, and JWKS' },
