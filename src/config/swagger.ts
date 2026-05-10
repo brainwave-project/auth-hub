@@ -53,7 +53,12 @@ const options: swaggerJSDoc.Options = {
     },
   },
   // Handlers moved to transport/http/handlers/ — point scan here
-  apis: ['./src/transport/http/handlers/*.ts', './src/transport/http/router.ts'],
+  apis: [
+    './src/transport/http/handlers/*.ts',
+    './src/transport/http/router.ts',
+    './dist/transport/http/handlers/*.js',
+    './dist/transport/http/router.js',
+  ],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
