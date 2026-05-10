@@ -1,13 +1,12 @@
 # =============================================================================
 # auth-hub — Multi-stage Dockerfile
 # =============================================================================
-# Must be built from the monorepo root (brainwave/) — not from auth-hub/:
+# Build from service directory:
 #
-#   cd brainwave/
-#   docker build -t auth-hub -f auth-hub/Dockerfile .
+#   cd auth-hub/
+#   docker build -t auth-hub .
 #
-# Reason: @brainwave-project/core is a file:../core local dependency.
-# The build context must include core/ so npm can resolve it at /core.
+# @brainwave-project/core is now a published npm package (@brainwave-project/core@^1.2.0)
 # =============================================================================
 
 # ---- Stage 1: Production dependencies ----
@@ -15,9 +14,7 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 
-# Place core at /core so npm resolves file:../core from /app
-COPY core/ /core/
-COPY auth-hub/package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev
 
 
@@ -26,13 +23,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY core/ /core/
-COPY auth-hub/package*.json ./
-COPY auth-hub/tsconfig.json ./
+COPY package*.json ./
+COPY tsconfig.json ./
 RUN npm ci
 
-COPY auth-hub/src/ ./src/
-COPY auth-hub/*.proto ./
+COPY src/ ./src/
+COPY *.proto ./
 
 RUN npm run build
 
@@ -47,8 +43,8 @@ RUN addgroup --system --gid 1001 nodejs \
 
 COPY --from=deps    --chown=appuser:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:nodejs /app/dist ./dist
-COPY --chown=appuser:nodejs auth-hub/*.proto ./
-COPY --chown=appuser:nodejs auth-hub/package.json ./
+COPY --chown=appuser:nodejs *.proto ./
+COPY --chown=appuser:nodejs package.json ./
 
 USER appuser
 
