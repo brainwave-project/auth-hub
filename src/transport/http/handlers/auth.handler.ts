@@ -2,6 +2,12 @@
 import { Router, Request, Response } from 'express';
 import type { EnvConfig } from '../../../config/env.js';
 import { getKeycloakEndpoints } from '../../../config/keycloak.config.js';
+import {
+  emitLoginSuccess,
+  emitLoginFailure,
+  emitLogout,
+  emitTokenRefreshed,
+} from '../../../events/emitter.js';
 
 export function createAuthRouter(config: EnvConfig): Router {
   const router = Router();
@@ -80,7 +86,18 @@ export function createAuthRouter(config: EnvConfig): Router {
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
-        if (!r.ok) return res.status(r.status).json(data);
+        if (!r.ok) {
+          emitLoginFailure({ email: username, correlationId: req.headers['x-correlation-id'] as string });
+          return res.status(r.status).json(data);
+        }
+        // Extract sub from the returned access token to use as actorId
+        const sub: string = (() => {
+          try {
+            const parts = (data.access_token as string).split('.');
+            return JSON.parse(Buffer.from(parts[1]!, 'base64url').toString()).sub ?? username;
+          } catch { return username; }
+        })();
+        emitLoginSuccess(sub, { email: username, correlationId: req.headers['x-correlation-id'] as string });
         res.status(200).json(data);
       })
       .catch((err) => {
@@ -124,6 +141,10 @@ export function createAuthRouter(config: EnvConfig): Router {
     if (post_logout_redirect_uri) {
       logoutUrl.searchParams.set('post_logout_redirect_uri', post_logout_redirect_uri);
     }
+
+    const actorId = req.headers['x-user-id'] as string | undefined ?? 'anonymous';
+    emitLogout(actorId, { correlationId: req.headers['x-correlation-id'] as string });
+
     if (id_token_hint) return res.redirect(302, logoutUrl.toString());
     res.status(200).json({ message: 'Logout acknowledged', logout_url: logoutUrl.toString() });
   });
@@ -173,6 +194,13 @@ export function createAuthRouter(config: EnvConfig): Router {
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) return res.status(r.status).json(data);
+        const sub: string = (() => {
+          try {
+            const parts = (data.access_token as string).split('.');
+            return JSON.parse(Buffer.from(parts[1]!, 'base64url').toString()).sub ?? 'unknown';
+          } catch { return 'unknown'; }
+        })();
+        emitTokenRefreshed(sub, { correlationId: req.headers['x-correlation-id'] as string });
         res.status(200).json(data);
       })
       .catch((err) => {

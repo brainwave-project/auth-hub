@@ -12,6 +12,10 @@ import {
   metricsHandler,
   configHandler,
 } from './transport/http/handlers/system.handler.js';
+import {
+  initAuthEventProducer,
+  disconnectAuthEventProducer,
+} from './events/emitter.js';
 
 // Fallback for Swagger direct access (bypasses Kong) in any environment.
 // Kong always sets X-User-Id via post-function for web traffic — this only
@@ -32,6 +36,16 @@ function injectUserId(req: Request, _res: Response, next: NextFunction) {
 
 export async function startServer() {
   const config = loadConfig();
+
+  // Kafka producer — fire-and-forget; failures never block auth responses
+  const kafkaBrokers = (process.env['KAFKA_BROKERS'] ?? 'kafka:9092').split(',');
+  await initAuthEventProducer(kafkaBrokers);
+
+  process.on('SIGTERM', async () => {
+    logger.info('SIGTERM received — shutting down gracefully');
+    await disconnectAuthEventProducer();
+    process.exit(0);
+  });
 
   const app = express();
 
