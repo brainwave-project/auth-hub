@@ -1,5 +1,6 @@
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import { correlationId, requestLogger, errorHandler } from '@brainwave-project/core';
 import { setupSwagger } from './config/swagger.js';
 import { loadConfig } from './config/env.js';
 import { registerHealthEndpoints } from './health/index.js';
@@ -51,6 +52,8 @@ export async function startServer() {
 
   app.use(express.json());
   app.use(metricsMiddleware);
+  app.use(correlationId());
+  app.use(requestLogger(logger));
   app.use(injectUserId);
 
   app.get('/health', healthHandler);
@@ -62,6 +65,7 @@ export async function startServer() {
   registerHealthEndpoints(app);
   mountHttpApi(app, config);
   setupSwagger(app);
+  app.use(errorHandler(logger));
 
   app.listen(config.port, () => {
     logger.info({ port: config.port, service: config.serviceName, env: config.environment }, 'AuthHub HTTP server started');
