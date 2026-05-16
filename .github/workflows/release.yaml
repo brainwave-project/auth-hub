@@ -20,13 +20,17 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Setup Node
+      - name: Setup Node + GitHub Packages registry
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: '@brainwave-project'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Run tests
         run: npm test --if-present
