@@ -386,6 +386,29 @@ export function createAuthRouter(config: EnvConfig): Router {
         return res.status(502).json({ error: 'Failed to reset password', detail });
       }
 
+      // ── 3.5 Ensure required profile fields are populated ─────────────────────
+      // Keycloak's default user profile requires `lastName` for the `user` role.
+      // If the account was created without one, login returns "Account is not
+      // fully set up" even after the password reset. Patch it now so auto-login
+      // succeeds. The user can update their profile in the app later.
+      const userForPatch = (await (
+        await fetch(`${kc.baseUrl}/admin/realms/${kc.realm}/users/${userId}`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        })
+      ).json()) as Record<string, unknown>;
+
+      if (!userForPatch['lastName']) {
+        // Derive a sensible fallback: the local-part of the email, or the username.
+        const fallback = String(username).includes('@')
+          ? String(username).split('@')[0]
+          : String(username);
+        await fetch(`${kc.baseUrl}/admin/realms/${kc.realm}/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ ...userForPatch, lastName: fallback }),
+        });
+      }
+
       // ── 4. Log in with the new password and return fresh tokens ─────────────
       const loginParams = new URLSearchParams();
       loginParams.set('grant_type', 'password');
