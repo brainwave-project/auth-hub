@@ -88,6 +88,16 @@ export function createAuthRouter(config: EnvConfig): Router {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
           emitLoginFailure({ email: username, correlationId: req.headers['x-correlation-id'] as string });
+          // Keycloak returns this when the user has UPDATE_PASSWORD required action (temp password).
+          // Return a structured code so the frontend can redirect to /set-password instead of
+          // showing a generic "invalid credentials" error.
+          if (
+            data.error === 'invalid_grant' &&
+            typeof data.error_description === 'string' &&
+            data.error_description.toLowerCase().includes('not fully set up')
+          ) {
+            return res.status(400).json({ error: 'PASSWORD_CHANGE_REQUIRED', username });
+          }
           return res.status(r.status).json(data);
         }
         // Extract sub from the returned access token to use as actorId
@@ -288,6 +298,115 @@ export function createAuthRouter(config: EnvConfig): Router {
     res.status(501).json({
       error: 'Password update with token is handled by Keycloak account flow; complete the reset via the link in the email.',
     });
+  });
+
+  /**
+   * @swagger
+   * /api/auth/set-password:
+   *   post:
+   *     summary: Set permanent password for a user with UPDATE_PASSWORD required action
+   *     description: >
+   *       Called after login returns PASSWORD_CHANGE_REQUIRED. Uses Keycloak Admin API to
+   *       reset the password permanently, then auto-logs in and returns fresh tokens so
+   *       the frontend can navigate directly to the app.
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [username, new_password]
+   *             properties:
+   *               username:     { type: string }
+   *               new_password: { type: string }
+   *     responses:
+   *       200:
+   *         description: Password updated and fresh tokens returned
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/TokenResponse' }
+   *       400: { description: username and new_password required }
+   *       404: { description: User not found in Keycloak }
+   *       501: { description: Keycloak not configured or admin credentials missing }
+   *       502: { description: Keycloak Admin API unavailable }
+   */
+  router.post('/set-password', async (req: Request, res: Response) => {
+    const { username, new_password } = req.body || {};
+
+    if (!kc || !endpoints) return res.status(501).json({ error: 'Keycloak not configured' });
+    if (!username || !new_password) return res.status(400).json({ error: 'username and new_password required' });
+    if (!kc.adminUser || !kc.adminPassword) {
+      return res.status(501).json({ error: 'Keycloak admin credentials not configured on server' });
+    }
+
+    try {
+      // ── 1. Get a short-lived admin token from the master realm ──────────────
+      const adminParams = new URLSearchParams();
+      adminParams.set('grant_type', 'password');
+      adminParams.set('client_id', 'admin-cli');
+      adminParams.set('username', kc.adminUser);
+      adminParams.set('password', kc.adminPassword);
+
+      const adminTokenRes = await fetch(
+        `${kc.baseUrl}/realms/master/protocol/openid-connect/token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: adminParams.toString(),
+        },
+      );
+      if (!adminTokenRes.ok) {
+        return res.status(502).json({ error: 'Failed to obtain Keycloak admin token' });
+      }
+      const { access_token: adminToken } = (await adminTokenRes.json()) as { access_token: string };
+
+      // ── 2. Look up the user by username (exact match) ────────────────────────
+      const usersRes = await fetch(
+        `${kc.baseUrl}/admin/realms/${kc.realm}/users?username=${encodeURIComponent(username)}&exact=true`,
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      );
+      if (!usersRes.ok) return res.status(502).json({ error: 'Failed to look up user in Keycloak' });
+
+      const users = (await usersRes.json()) as Array<{ id: string }>;
+      if (!users || users.length === 0) return res.status(404).json({ error: `User '${username}' not found` });
+      const userId = users[0].id;
+
+      // ── 3. Set a permanent password via Admin API (clears UPDATE_PASSWORD action) ─
+      const resetRes = await fetch(
+        `${kc.baseUrl}/admin/realms/${kc.realm}/users/${userId}/reset-password`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ type: 'password', value: new_password, temporary: false }),
+        },
+      );
+      if (!resetRes.ok) {
+        const detail = await resetRes.json().catch(() => ({}));
+        return res.status(502).json({ error: 'Failed to reset password', detail });
+      }
+
+      // ── 4. Log in with the new password and return fresh tokens ─────────────
+      const loginParams = new URLSearchParams();
+      loginParams.set('grant_type', 'password');
+      loginParams.set('client_id', kc.clientId);
+      loginParams.set('username', username);
+      loginParams.set('password', new_password);
+      if (kc.clientSecret) loginParams.set('client_secret', kc.clientSecret);
+
+      const loginRes = await fetch(endpoints.token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: loginParams.toString(),
+      });
+      const loginData = await loginRes.json().catch(() => ({}));
+      if (!loginRes.ok) return res.status(loginRes.status).json(loginData);
+
+      emitLoginSuccess(username, { correlationId: req.headers['x-correlation-id'] as string });
+      return res.status(200).json(loginData);
+    } catch (err) {
+      return res.status(502).json({ error: 'Keycloak unavailable', details: String((err as Error).message) });
+    }
   });
 
   return router;
