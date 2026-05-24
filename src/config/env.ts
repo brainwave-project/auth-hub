@@ -13,6 +13,9 @@ export type KeycloakConfig = {
   clientSecret?: string;
   /** Public base URL for redirects (e.g. https://api.example.com). */
   redirectBaseUrl?: string;
+  /** Admin credentials for Keycloak Admin API (e.g. set-password, user lookup). */
+  adminUser?: string;
+  adminPassword?: string;
 };
 
 /** Validated application configuration from environment variables. */
@@ -113,6 +116,8 @@ export function loadConfig(): EnvConfig {
       clientId: keycloakClientId,
       clientSecret: process.env.KEYCLOAK_CLIENT_SECRET?.trim() || undefined,
       redirectBaseUrl: process.env.KEYCLOAK_REDIRECT_BASE_URL?.trim() || undefined,
+      adminUser: process.env.KEYCLOAK_ADMIN_USER?.trim() || undefined,
+      adminPassword: process.env.KEYCLOAK_ADMIN_PASSWORD || undefined,
     };
   }
 
